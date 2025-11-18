@@ -268,6 +268,7 @@ class Annex:
 
         # 2. See if object is in the annex
         if self.annex_is_remote:
+            raise RiftError(f"HERE {tmp_file}")
             # Checking annex, expecting annex path to be an http(s) url
             success = False
 
