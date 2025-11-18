@@ -49,6 +49,7 @@ from urllib.parse import urlparse
 
 import boto3
 import botocore
+import requests
 import yaml
 
 from rift import RiftError
@@ -273,27 +274,29 @@ class Annex:
             idpath = os.path.join(self.annex_path, identifier)
             with tempfile.TemporaryDirectory() as tmp_dir:
                 tmp_file = os.path.join(tmp_dir, identifier)
-                cmd = ["curl", "-sS", "-w", '"%{http_code}"', "-o", tmp_file, idpath]
                 try:
-                    proc = subprocess.run(cmd, check=True, capture_output=True, text=True)
-                except subprocess.CalledProcessError as e:
-                    raise RiftError(f"failed to fetch file from annex: {idpath}") from e
+                    res = requests.get(idpath, stream=True, timeout=15)
 
-                if "404" not in proc.stdout.strip():
-                    if self.restore_cache:
-                        cached_path = self.get_cached_path(identifier)
-                        shutil.move(tmp_file, cached_path)
-                    else:
-                        logging.debug('Extracting %s to %s', identifier, destpath)
-                        shutil.move(tmp_file, destpath)
-                    success = True
+                    if res:
+                        with open(tmp_file, 'wb') as f:
+                            for chunk in res.iter_content(chunk_size=8192):
+                                f.write(chunk)
 
-            if success:
-                if self.restore_cache:
-                    logging.debug('Extracting %s to %s', identifier, destpath)
-                    cached_path = self.get_cached_path(identifier)
-                    shutil.copyfile(cached_path, destpath)
-                return
+                            if self.restore_cache:
+                                cached_path = self.get_cached_path(identifier)
+                                shutil.move(tmp_file, cached_path)
+                                logging.debug('Extracting %s to %s', identifier, destpath)
+                                cached_path = self.get_cached_path(identifier)
+                                shutil.copyfile(cached_path, destpath)
+                            else:
+                                logging.debug('Extracting %s to %s', identifier, destpath)
+                                shutil.move(tmp_file, destpath)
+
+                            return
+                    elif res.status_code != 404:
+                        res.raise_for_status()
+                except requests.exceptions.RequestException as e:
+                    raise RiftError(f"failed to fetch file from annex: {idpath}: {e}") from e
 
             logging.info("did not find object in annex, will search staging_annex next")
         else:
