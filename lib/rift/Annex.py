@@ -619,7 +619,7 @@ class Annex:
                             try:
                                 res = requests.get(f, stream=True, timeout=15)
                                 if res:
-                                    with open(tmp_file, 'wb') as f:
+                                    with open(tmp, 'wb') as f:
                                         for chunk in res.iter_content(chunk_size=8192):
                                             f.write(chunk)
                                         tar.add(tmp, arcname=basename)
