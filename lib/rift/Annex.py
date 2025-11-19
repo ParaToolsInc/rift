@@ -617,19 +617,19 @@ class Annex:
                         for f in (annex_file, annex_file_info):
                             basename = os.path.basename(f)
                             tmp = os.path.join(tmp_dir.name, basename)
-                            cmd = ["curl", "-sS", "-w", '"%{http_code}"', "-o", tmp, f]
-                            try:
-                                proc = subprocess.run(
-                                    cmd,
-                                    check=True,
-                                    capture_output=True,
-                                    text=True
-                                )
-                            except subprocess.CalledProcessError as e:
-                                raise RiftError(f"failed to fetch file from annex: {f}") from e
 
-                            if "404" not in proc.stdout.strip():
-                                tar.add(tmp, arcname=basename)
+                            try:
+                                res = requests.get(f, stream=True, timeout=15)
+
+                            if res:
+                                with open(tmp_file, 'wb') as f:
+                                    for chunk in res.iter_content(chunk_size=8192):
+                                        f.write(chunk)
+                                    tar.add(tmp, arcname=basename)
+                            elif res.status_code != 404:
+                                res.raise_for_status()
+                            except requests.exceptions.RequestException as e:
+                                raise RiftError(f"failed to fetch file from annex: {f}: {e}") from e
                     else:
                         tar.add(annex_file, arcname=os.path.basename(annex_file))
                         tar.add(annex_file_info, arcname=os.path.basename(annex_file_info))
