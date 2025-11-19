@@ -280,8 +280,6 @@ class Annex:
                         with open(tmp_file, 'wb') as f:
                             for chunk in res.iter_content(chunk_size=8192):
                                 f.write(chunk)
-                            
-                            raise RiftError(f"DOWNLOADED FILE {tmp_file}")
 
                             if self.restore_cache:
                                 cached_path = self.get_cached_path(identifier)
